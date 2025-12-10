@@ -22,14 +22,6 @@ if os.path.exists("sample.mp3"):
 
 # 音声アップロード
 uploaded_file = st.file_uploader("音声ファイルを選択してください", type=["mp3", "wav", "m4a"])
-
-# URLで検索
-url = st.text_input(
-    "曲のURLを入力してください",
-    placeholder="例: https://www.example.com/sample.mp3"
-)
-
-
 if uploaded_file is not None:
     # アップロードされた音声を再生
     st.audio(uploaded_file, format=uploaded_file.type)
@@ -102,3 +94,47 @@ if uploaded_file is not None:
             # 結果を表示
             st.success("説明:")
             st.write(response.text)
+
+st.markdown("<div style='height:75px;'></div>", unsafe_allow_html=True)
+
+# URLで検索
+url = st.text_input("曲のURLを入力してください（例: https://www.youtube.com/watch?v=...）")
+music_name = st.text_input("曲名を入力してください")
+detailed_information = st.text_area("精度を高める場合にはこちらに詳細情報（アーティスト名は？曲のジャンルは？）を入力してください（任意）")
+if url and music_name:
+    if st.button("似た曲を探す(URLベース)"):
+        with st.spinner("検索中..."):
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                st.error("環境変数 `GEMINI_API_KEY` を設定してください。")
+            else:
+                client = genai.Client(api_key=api_key)
+
+                prompt = (
+                    "以下のURLと曲名が指す曲について、アーティストを特定して書き出してください。"
+                    "その後、この曲に似た曲をYouTube Music上から3曲ピックアップして、"
+                    "曲名・アーティストを併記してください。"
+                    f"\n\nURL: {url}\n\n"
+                    f"曲名: {music_name}\n\n"
+                    f"詳細情報: {detailed_information}\n\n"
+                    "YouTube上で似た曲のタイトルとアーティスト、可能ならリンクを提示してください。"
+                )
+
+                contents = [
+                    types.Content(
+                        role="user",
+                        parts=[types.Part.from_text(text=prompt)]
+                    ),
+                ]
+
+                try:
+                    response = client.models.generate_content(
+                        model = "gemini-flash-lite-latest",
+                        contents = contents,
+                        config = types.GenerateContentConfig(),
+                    )
+                    st.subheader("結果（URLベース）")
+                    st.write(response.text)
+                except Exception as e:
+                    st.error(f"問い合わせ中にエラーが発生しました: {e}")
+                    
